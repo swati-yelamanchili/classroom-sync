@@ -1,0 +1,5 @@
+title,subject,topic,description,keywords,aliases,videoUrl,scriptText,language,gradeLevel,sourceOrganisation,sourceReference,provenance,curriculumOrder,prerequisites
+"Replace with the resource title","Subject name","Topic name","Optional description","keyword one;keyword two","other name;another name","https://example.com/video-page","First paragraph of the existing script.
+
+Second paragraph, on its own lines.
+Line breaks inside the quotes are preserved.","English","Grade 3","Name of the source organisation","Where this resource came from","unverified",1,"Title or topic of a prerequisite resource"

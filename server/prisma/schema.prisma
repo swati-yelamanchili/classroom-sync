@@ -1,0 +1,113 @@
+// SQLite for local demos. To move to PostgreSQL change `provider`, point DATABASE_URL at the
+// server and run `prisma migrate dev` to regenerate migrations; no application code uses
+// SQLite-specific features. List-like metadata is stored as JSON text for that reason.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Resource {
+  id                 String   @id @default(cuid())
+  title              String
+  subject            String?
+  topic              String?
+  description        String?
+  keywords           String   @default("[]") // JSON string[]
+  aliases            String   @default("[]") // JSON string[]
+  videoUrl           String?
+  scriptText         String? // Stored and served byte-for-byte; never rewritten.
+  language           String?
+  gradeLevel         String?
+  sourceOrganisation String?
+  sourceReference    String?
+  provenance         String   @default("unverified") // demo | unverified | verified
+  curriculumOrder    Int?
+  prerequisites      String   @default("[]") // JSON string[] of resource titles or topics
+  dedupeKey          String   @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  lessonTopics LessonTopic[]
+
+  @@index([videoUrl])
+}
+
+model Lesson {
+  id          String    @id @default(cuid())
+  title       String
+  status      String    @default("draft") // draft | confirmed
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  topics   LessonTopic[]
+  sessions ClassroomSession[]
+}
+
+model LessonTopic {
+  id                       String  @id @default(cuid())
+  lessonId                 String
+  resourceId               String?
+  requestedTopic           String
+  displayTitle             String
+  position                 Int
+  enteredPosition          Int // Where the teacher typed it, so their order can be restored.
+  estimatedDurationSeconds Int     @default(60)
+  matchStatus              String  @default("unresolved") // exact | normalized | alias | fuzzy | manual | unresolved
+  matchConfidence          Float?
+  matchExplanation         String?
+  sequenceNote             String?
+
+  lesson   Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  resource Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+
+  @@unique([lessonId, position])
+  @@index([resourceId])
+}
+
+model ClassroomSession {
+  id                         String    @id @default(cuid())
+  lessonId                   String
+  sessionCode                String    @unique
+  status                     String    @default("created") // created | active | paused | ended
+  syncMode                   String    @default("voice") // voice | timestamp
+  currentTopicIndex          Int       @default(0)
+  revision                   Int       @default(1)
+  startedAt                  DateTime?
+  pausedAt                   DateTime?
+  activeSince                DateTime? // Set only while active: start of the current running stretch.
+  elapsedActiveSeconds       Float     @default(0) // Accumulated up to activeSince.
+  topicStartedElapsedSeconds Float     @default(0) // Session elapsed time when the current topic began.
+  endedAt                    DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  lesson Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  events SessionEvent[]
+
+  @@index([status])
+  @@index([lessonId])
+}
+
+// Basic session history. Commands only: never transcripts or audio.
+model SessionEvent {
+  id         String   @id @default(cuid())
+  sessionId  String
+  type       String // started | paused | resumed | ended | topic_changed | mode_changed
+  source     String // manual | voice | timer | system
+  commandId  String?
+  fromIndex  Int?
+  toIndex    Int?
+  topicTitle String?
+  revision   Int
+  createdAt  DateTime @default(now())
+
+  session ClassroomSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, commandId])
+  @@index([sessionId, createdAt])
+}

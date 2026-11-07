@@ -1,0 +1,31 @@
+{
+  "name": "ashray-akruti-classroom-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Teacher-student synchronised classroom platform for existing Ashray Akruti resources",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "node -e \"require('fs').existsSync('.env')||require('fs').copyFileSync('.env.example','.env')\" && npm install && npm run db:migrate && npm run db:seed",
+    "dev": "concurrently -n server,client -c teal,blue \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "npm run start -w server",
+    "typecheck": "tsc --noEmit && npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client",
+    "test": "npm run test -w shared && npm run test -w server && npm run test -w client",
+    "test:e2e": "playwright test",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:seed": "npm run db:seed -w server"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.56.0",
+    "concurrently": "^9.2.0",
+    "typescript": "^5.9.0"
+  }
+}

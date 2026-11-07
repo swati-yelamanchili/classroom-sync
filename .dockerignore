@@ -1,0 +1,8 @@
+node_modules
+**/node_modules
+**/dist
+**/*.db
+.env
+e2e/.tmp
+test-results
+server/test/.tmp

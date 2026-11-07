@@ -1,0 +1,21 @@
+{
+  "resources": [
+    {
+      "title": "Replace with the resource title",
+      "subject": "Subject name",
+      "topic": "Topic name",
+      "description": "Optional description",
+      "keywords": ["keyword one", "keyword two"],
+      "aliases": ["other name", "another name"],
+      "videoUrl": "https://example.com/video-page",
+      "scriptText": "First paragraph of the existing script.\n\nSecond paragraph, on its own lines.\nLine breaks are preserved.",
+      "language": "English",
+      "gradeLevel": "Grade 3",
+      "sourceOrganisation": "Name of the source organisation",
+      "sourceReference": "Where this resource came from",
+      "provenance": "unverified",
+      "curriculumOrder": 1,
+      "prerequisites": ["Title or topic of a prerequisite resource"]
+    }
+  ]
+}

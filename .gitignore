@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.db
+*.db-journal
+test-results/
+e2e/.tmp/
+server/test/.tmp/
+playwright-report/
+.DS_Store
+.claude/
