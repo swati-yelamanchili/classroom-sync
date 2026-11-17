@@ -6,3 +6,4 @@ export * from './voice';
 export * from './video';
 export * from './events';
 export * from './topicRecognition';
+export * from './language';

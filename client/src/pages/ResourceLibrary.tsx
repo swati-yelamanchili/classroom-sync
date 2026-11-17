@@ -4,13 +4,13 @@ import { Link } from 'react-router-dom';
 import { PROVENANCES, type Provenance, type ResourceDTO } from '@classroom/shared';
 import { ProvenanceBadge } from '@/components/badges';
 import { EmptyState, Loading, Notice } from '@/components/feedback';
-import { ResourcePreview } from '@/components/ResourceContent';
+import { ResourceFacts, ResourcePreview } from '@/components/ResourceContent';
 import { PageBody } from '@/components/TeacherShell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
-import { useAsync, usePageTitle } from '@/hooks/useAsync';
+import { useAsync, useDebounced, usePageTitle } from '@/hooks/useAsync';
 import { api, errorMessage, type ResourceDraft } from '@/lib/api';
 
 const PROVENANCE_HELP: Record<Provenance, string> = {
@@ -113,7 +113,8 @@ export function ResourceLibrary() {
   usePageTitle('Resource library');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | Provenance>('all');
-  const resources = useAsync(() => api.resources(query.trim() || undefined), [query]);
+  const search = useDebounced(query.trim());
+  const resources = useAsync(() => api.resources(search || undefined), [search]);
   const [editing, setEditing] = useState<ResourceDTO | 'new' | null>(null);
   const [previewing, setPreviewing] = useState<ResourceDTO | null>(null);
   const [deleting, setDeleting] = useState<ResourceDTO | null>(null);
@@ -146,7 +147,8 @@ export function ResourceLibrary() {
       <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_16rem]">
         <div className="space-y-1">
           <Label htmlFor="library-search">Search</Label>
-          <Input id="library-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input id="library-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} aria-describedby="library-search-hint" />
+          <p id="library-search-hint" className="text-sm text-ink-soft">Title, topic, grade, subject or language, in any order. Small typos are fine.</p>
         </div>
         <div className="space-y-1">
           <Label htmlFor="library-filter">Show</Label>
@@ -172,7 +174,12 @@ export function ResourceLibrary() {
       )}
 
       {visible.length > 0 && (
-        <Card className="mt-6 divide-y divide-line">
+        <p className="mt-4 text-ink-soft" role="status">
+          {visible.length} {visible.length === 1 ? 'resource' : 'resources'}{search ? ', best matches first' : ''}
+        </p>
+      )}
+      {visible.length > 0 && (
+        <Card className="mt-2 divide-y divide-line">
           {visible.map((resource) => (
             <div key={resource.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5" data-testid="resource-row">
               <div className="min-w-56 flex-1">
@@ -185,7 +192,7 @@ export function ResourceLibrary() {
                   <span className={`inline-flex items-center gap-1.5 ${resource.scriptText ? 'text-good' : 'text-bad'}`}>
                     {resource.scriptText ? <FileText className="size-4" aria-hidden /> : <FileX className="size-4" aria-hidden />}Script: {resource.scriptText ? 'yes' : 'no'}
                   </span>
-                  {resource.subject && <span className="text-ink-soft">{resource.subject}</span>}
+                  <ResourceFacts resource={resource} />
                 </div>
               </div>
               <div className="flex items-center gap-1">

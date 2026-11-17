@@ -4,6 +4,7 @@ import type { ImportReport, Provenance, ResourceDTO, ResourceStats } from '@clas
 import { ApiError, conflict, notFound } from '../lib/errors';
 import { normalizeTitle } from './matching';
 import { resourceInputSchema, type ResourceInput } from './resourceSchema';
+import { searchResources } from './search';
 
 const parseList = (value: string): string[] => {
   try {
@@ -83,12 +84,7 @@ export class ResourceService {
 
   async list(query?: string): Promise<ResourceDTO[]> {
     const rows = await this.db.resource.findMany({ orderBy: [{ subject: 'asc' }, { title: 'asc' }] });
-    const dtos = rows.map(toResourceDTO);
-    const q = normalizeTitle(query ?? '');
-    if (!q) return dtos;
-    return dtos.filter((r) =>
-      [r.title, r.topic, r.subject, r.description, ...r.aliases, ...r.keywords].some((v) => v && normalizeTitle(v).includes(q)),
-    );
+    return searchResources(rows.map(toResourceDTO), query ?? '');
   }
 
   async stats(): Promise<ResourceStats> {

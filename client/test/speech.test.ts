@@ -111,6 +111,36 @@ describe('SpeechRecognitionService', () => {
     expect(dispatch).toHaveBeenCalledTimes(2);
   });
 
+  it('runs each command when recognition joins them into one transcript', async () => {
+    const { adapter, service, dispatch } = setup();
+    service.enable();
+    adapter.say('start topic 2 next topic');
+    await flush();
+    expect(dispatch.mock.calls.map(([request]) => request)).toEqual([
+      { kind: 'topic', change: { action: 'goto', index: 1, source: 'voice' } },
+      { kind: 'topic', change: { action: 'next', source: 'voice' } },
+    ]);
+  });
+
+  it('logs everything heard only while testing mode is on', async () => {
+    const { adapter, service, last } = setup();
+    service.enable();
+    adapter.say('Today we will study mathematics');
+    await flush();
+    expect(last().log).toEqual([]);
+
+    service.setLogging(true);
+    adapter.say('Today we will study mathematics');
+    adapter.say('Start Topic 2');
+    adapter.say('Start Topic 2');
+    await flush();
+    expect(last().log.map((e) => e.result)).toEqual(['Switched', 'Go to Topic 2: ignored as a repeat', 'Not a command: ignored']);
+    expect(last().log[0]!.latencyMs).toBeTypeOf('number');
+
+    service.setLogging(false);
+    expect(last().log).toEqual([]);
+  });
+
   it('checks the engine\'s alternative transcripts', async () => {
     const { adapter, service, dispatch } = setup();
     service.enable();

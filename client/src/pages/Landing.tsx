@@ -36,7 +36,7 @@ export function Landing() {
             <GraduationCap className="size-9 shrink-0" aria-hidden />
             <span className="flex-1">
               <span className="block text-2xl font-bold">I'm a student</span>
-              <span className="block">Join with a session code</span>
+              <span className="block">Join with a code, or choose a lesson</span>
             </span>
             <ArrowRight className="size-6 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden />
           </Link>
@@ -52,7 +52,7 @@ export function Landing() {
           ))}
         </ol>
         <p className="mt-10 max-w-2xl text-ink-soft">
-          This platform does not create educational content. It only organises and displays resources that already exist in the library.
+          This platform does not create educational content. Videos, scripts and transcripts come only from the library and from Ashray Akruti's own YouTube videos, shown exactly as they are.
         </p>
       </main>
     </div>

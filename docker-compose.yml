@@ -1,0 +1,21 @@
+# docker compose up --build
+# Reads TEACHER_PASSCODE, AUTH_SECRET and PUBLIC_BASE_URL from .env next to this file.
+services:
+  classroom-sync:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      TEACHER_PASSCODE: ${TEACHER_PASSCODE:?Set TEACHER_PASSCODE in .env}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env to a long random string}
+      # Inside Docker the app cannot see the laptop's Wi-Fi address, so set this for student links,
+      # for example http://192.168.1.20:4000
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # "true" only behind HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    volumes:
+      - classroom-data:/data
+    restart: unless-stopped
+
+volumes:
+  classroom-data:

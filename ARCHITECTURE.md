@@ -5,7 +5,7 @@
 1. **The backend is authoritative.** No client state or browser storage decides the current topic. `localStorage` holds only per-device preferences: script text size, wake phrase, speech language.
 2. **Commands go up over REST; state comes down over Socket.IO.** Students have no write path at all.
 3. **Snapshots, not deltas.** Every broadcast is complete, so one missed event cannot leave a client inconsistent.
-4. **Nothing is invented.** Matching returns only rows from the database. Sequencing uses only stated metadata.
+4. **Nothing is invented.** Matching and search return only rows from the database. Sequencing uses only stated metadata. Transcripts are YouTube's captions, shown unedited.
 
 ## Components
 
@@ -25,6 +25,11 @@
 | `server/src/realtime/hub.ts` | Rooms, join and watch, presence, broadcasting |
 | `client/src/hooks/useSessionChannel.ts` | Socket subscription, revision guard, connection state |
 | `client/src/speech/` | Speech adapter, service, React binding |
+| `server/src/services/search.ts` | Ranked, typo-tolerant resource search |
+| `server/src/services/transcripts.ts` | Transcript download and storage, background queue, student lesson views |
+| `server/scripts/youtube_transcript.py` | Fetches a YouTube transcript with timestamps (`youtube-transcript-api`) |
+| `client/src/components/Transcript.tsx` | Transcript lines with times, search, tap to play from a time |
+| `client/src/pages/StudentBrowse.tsx`, `client/src/speech/studentListener.ts` | Self-paced student pages; listening for topic commands on the student's device |
 
 ## Voice to student
 
@@ -90,12 +95,20 @@ Otherwise there is no match, and no resource is attached. Subject is deliberatel
 
 Stable topological sort. The baseline and tie-breaker is the teacher's order. Constraints come from explicit `prerequisites` present in the lesson, and `curriculumOrder` within one subject. Topics with no resource move to the end, with a stated reason. Contradictory metadata falls back to the teacher's order. Teachers can restore their order with one button.
 
+## Transcripts
+
+- **Trigger:** creating, editing or re-matching a lesson queues a download for each selected resource with a YouTube video that has no transcript yet. One per resource, reused everywhere. Downloads run one at a time in the background; the route waits only for queueing.
+- **On demand:** a transcript nobody has fetched yet is downloaded when first requested. Simultaneous requests share one download.
+- **Stored:** status (`ready` or `failed`), language, whether captions are automatic, and the segments `[{ start, duration, text }]`. A failure keeps a readable reason and is retried after 10 minutes, or at once with Fetch again.
+- **Endpoints:** teacher `GET/POST /api/resources/:id/transcript`; students `GET /api/student/session/:code/topics/:n/transcript` (live) and `GET /api/student/lessons/:id/topics/:n/transcript` (self-paced, confirmed lessons only).
+- **Playing from a time:** the YouTube player is reloaded with `start=<seconds>&autoplay=1`. Nothing plays until the student taps.
+
 ## Security
 
 - HMAC-signed, `httpOnly`, `SameSite=Strict` cookie; timing-safe passcode check; login rate limit.
 - Every teacher route and socket watch is authorised server-side. Input is validated with Zod; Prisma parameterises queries.
 - Scripts render as React text, never as HTML. Helmet CSP limits scripts to same origin and frames to the YouTube and Vimeo players. Video URLs allow only http(s) and local demo assets.
-- No student data collected. No audio or transcripts stored or sent to the backend.
+- No student data collected. No audio or speech transcripts are stored or sent to the backend. Video transcripts (public YouTube captions) are stored.
 
 ## Moving to PostgreSQL
 

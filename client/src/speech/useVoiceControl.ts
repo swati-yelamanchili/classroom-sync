@@ -24,7 +24,9 @@ export function useVoiceControl(snapshot: TeacherSnapshot | null, onSnapshot: (s
   snapshotRef.current = snapshot;
   const [requireWake, setRequireWakeState] = useState(() => readPreference(WAKE_PREF) === 'true');
   const [language, setLanguageState] = useState(() => readPreference(LANGUAGE_PREF) ?? 'en-IN');
-  const [status, setStatus] = useState<VoiceStatus>({ state: 'off', message: null, lastCommand: null, heardNonCommand: false });
+  const [status, setStatus] = useState<VoiceStatus>({ state: 'off', message: null, lastCommand: null, heardNonCommand: false, log: [] });
+  // Testing mode is deliberately not remembered: it shows everything said, so it must be switched on each time.
+  const [logging, setLoggingState] = useState(false);
 
   const dispatch = useCallback(
     async (request: CommandRequest): Promise<string> => {
@@ -72,6 +74,7 @@ export function useVoiceControl(snapshot: TeacherSnapshot | null, onSnapshot: (s
   }, [service]);
 
   useEffect(() => service.setGrammar(grammar), [service, grammar]);
+  useEffect(() => service.setLogging(logging), [service, logging]);
 
   // Automatic advancement modes are mutually exclusive: the microphone stops outside Voice mode.
   const voiceAllowed = snapshot?.syncMode === 'voice' && snapshot.status !== 'ended';
@@ -90,6 +93,8 @@ export function useVoiceControl(snapshot: TeacherSnapshot | null, onSnapshot: (s
       writePreference(WAKE_PREF, String(value));
       setRequireWakeState(value);
     },
+    logging,
+    setLogging: setLoggingState,
     language,
     setLanguage: (value: string) => {
       writePreference(LANGUAGE_PREF, value);

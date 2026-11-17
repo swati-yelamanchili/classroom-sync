@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newerSnapshot } from './revision';
 import { canChangeTopic, canTransition } from './stateMachine';
 import { computeElapsedSeconds, computeTimerAdvances, formatClock, secondsUntilNextAdvance } from './timing';
-import { classifyVideoUrl, isAllowedVideoUrl } from './video';
+import { classifyVideoUrl, isAllowedVideoUrl, youtubeVideoId } from './video';
 
 describe('newerSnapshot', () => {
   const at = (revision: number, topic: number) => ({ revision, topic });
@@ -102,5 +102,8 @@ describe('video URLs', () => {
   it('never assumes any other page can be embedded', () => {
     expect(classifyVideoUrl('https://example.com/video-page').kind).toBe('link');
     expect(classifyVideoUrl('https://www.youtube.com/channel/abc').kind).toBe('link');
+    expect(youtubeVideoId('https://youtu.be/abcdef12345?t=3')).toBe('abcdef12345');
+    expect(youtubeVideoId('https://www.youtube.com/watch?v=abcdef12345&list=PLx')).toBe('abcdef12345');
+    expect(youtubeVideoId('https://vimeo.com/123')).toBeNull();
   });
 });

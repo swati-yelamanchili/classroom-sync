@@ -12,10 +12,12 @@
     "db:migrate": "dotenv -e ../.env -- prisma migrate deploy",
     "db:migrate:dev": "dotenv -e ../.env -- prisma migrate dev",
     "db:seed": "dotenv -e ../.env -- tsx prisma/seed.ts",
+    "db:import": "dotenv -e ../.env -- tsx prisma/import.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "compression": "^1.8.2",
     "cookie": "^1.0.2",
     "cors": "^2.8.5",
     "express": "^5.1.0",
@@ -28,6 +30,7 @@
   },
   "devDependencies": {
     "@classroom/shared": "*",
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^22.18.0",

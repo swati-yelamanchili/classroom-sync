@@ -33,7 +33,7 @@ import { useLiveElapsed } from '@/hooks/useLiveElapsed';
 import { useTeacherSession, type ConnectionState } from '@/hooks/useSessionChannel';
 import { api, errorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import type { VoiceState, VoiceStatus } from '@/speech/SpeechRecognitionService';
+import type { HeardEntry, VoiceState, VoiceStatus } from '@/speech/SpeechRecognitionService';
 import { useVoiceControl, VOICE_LANGUAGES } from '@/speech/useVoiceControl';
 
 const VOICE_STATE_UI: Record<VoiceState, { label: string; className: string; Icon: typeof Mic }> = {
@@ -169,9 +169,48 @@ function VoicePanel({ snapshot, voice }: { snapshot: TeacherSnapshot; voice: Ret
               {VOICE_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
             </Select>
           </div>
+          <label className="mt-3 flex items-start gap-2">
+            <input type="checkbox" className="mt-1.5 size-4 accent-teal" checked={voice.logging} onChange={(e) => voice.setLogging(e.target.checked)} />
+            <span>Testing mode: show everything the microphone hears. Kept on this device only and cleared when switched off.</span>
+          </label>
         </details>
+        {voice.logging && <VoiceTestLog log={voice.status.log} />}
       </div>
     </Card>
+  );
+}
+
+function VoiceTestLog({ log }: { log: HeardEntry[] }) {
+  const [copied, setCopied] = useState(false);
+  const timed = log.filter((e) => e.latencyMs !== undefined);
+  const average = timed.length ? Math.round(timed.reduce((sum, e) => sum + e.latencyMs!, 0) / timed.length) : null;
+  // Tab-separated, oldest first, so it pastes straight into a spreadsheet for the evaluation.
+  const copy = async () => {
+    const rows = [...log].reverse().map((e) => [new Date(e.at).toLocaleTimeString(), e.heard, e.result, e.latencyMs ?? ''].join('\t'));
+    try {
+      await navigator.clipboard.writeText(['Time\tHeard\tResult\tLatency (ms)', ...rows].join('\n'));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <div data-testid="voice-log" className="rounded-md border border-line p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-bold">Heard ({log.length})</h3>
+        <Button variant="secondary" size="sm" disabled={!log.length} onClick={copy}>{copied ? <Check aria-hidden /> : <Copy aria-hidden />}{copied ? 'Copied' : 'Copy log'}</Button>
+      </div>
+      {average !== null && <p className="mt-1 text-ink-soft">Average time to update: {average} ms over {timed.length} commands</p>}
+      <ol className="mt-2 max-h-64 space-y-1.5 overflow-y-auto text-sm">
+        {log.map((e, i) => (
+          <li key={log.length - i}>
+            <span className="text-ink-soft tabular-nums">{new Date(e.at).toLocaleTimeString()}</span> "{e.heard}"
+            <span className="block text-ink-soft">{e.result}{e.latencyMs !== undefined && ` (${e.latencyMs} ms)`}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Notice } from '@/components/feedback';
 import { SkipLink, Wordmark } from '@/components/TeacherShell';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,7 @@ export function Join() {
             {busy ? 'Joining…' : 'Join lesson'}<ArrowRight aria-hidden />
           </Button>
         </form>
+        <p className="mt-8 text-lg"><Link to="/lessons">No code? Choose a lesson yourself and watch it with its transcript.</Link></p>
       </main>
     </div>
   );

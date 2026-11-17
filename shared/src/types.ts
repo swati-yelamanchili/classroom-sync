@@ -108,6 +108,58 @@ export interface LessonListItem {
   sessions: SessionSummary[];
 }
 
+export const LESSON_PLAN_PARTS = 5;
+export type LessonPlanStatus = 'pending' | 'ready' | 'failed';
+
+export interface LessonPlanPart {
+  title: string;
+  content: string;
+}
+
+/** An AI-written plan for one video. Resources without a YouTube video have no plan (null). */
+export interface LessonPlanDTO {
+  status: LessonPlanStatus;
+  /** Exactly LESSON_PLAN_PARTS when ready, empty otherwise. */
+  parts: LessonPlanPart[];
+  transcriptLanguage: string | null;
+  error: string | null;
+  updatedAt: string;
+}
+
+/** One caption line; times are seconds from the start of the video. */
+export interface TranscriptSegment {
+  start: number;
+  duration: number;
+  text: string;
+}
+
+/** A video's YouTube transcript, as downloaded: usually YouTube's automatic captions. */
+export interface TranscriptDTO {
+  language: string;
+  generated: boolean;
+  segments: TranscriptSegment[];
+}
+
+export interface StudentLessonListItem {
+  id: string;
+  title: string;
+  topicCount: number;
+}
+
+export interface StudentLessonTopic {
+  number: number;
+  displayTitle: string;
+  resource: ResourceView | null;
+  plan: LessonPlanDTO | null;
+}
+
+/** A confirmed lesson as a student browsing on their own sees it: every topic with its video and plan. */
+export interface StudentLessonDTO {
+  id: string;
+  title: string;
+  topics: StudentLessonTopic[];
+}
+
 /** Only what a device in the classroom needs to display a resource. */
 export interface ResourceView {
   title: string;

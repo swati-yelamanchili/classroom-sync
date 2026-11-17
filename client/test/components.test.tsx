@@ -165,7 +165,7 @@ describe('ProvenanceBadge', () => {
 });
 
 describe('VoiceStatusDisplay', () => {
-  const base = { message: null, lastCommand: null, heardNonCommand: false };
+  const base = { message: null, lastCommand: null, heardNonCommand: false, log: [] };
   it.each([
     ['off', 'Microphone off'],
     ['listening', 'Listening'],

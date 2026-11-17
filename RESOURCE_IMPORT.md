@@ -2,6 +2,16 @@
 
 How to put real Ashray Akruti videos and scripts into the library. **No application code changes are needed.**
 
+## Ashray Akruti's YouTube lessons
+
+[resources/ashray-akruti-youtube.csv](resources/ashray-akruti-youtube.csv) holds 523 lessons from Ashray Akruti's YouTube channel and is imported by `npm run setup`. To import it, or any other file, from the command line with the same checks as the Import page:
+
+```bash
+npm run db:import -- resources/ashray-akruti-youtube.csv
+```
+
+How the file was made: every video in the channel's playlists, with the title taken from the YouTube title minus the grade, language and "Lessons in Sign Language for H.I" labels. Grade and subject together form `subject` (for example "Grade 4 EVS"), so the same topic in another grade is not treated as a duplicate. The same video in two playlists, or two videos with the same topic, grade and language, appear once. Videos added to the channel later, or outside its playlists, are not included.
+
 ## Replacing the demo resources
 
 1. Export your resources to CSV or JSON using the schema below. Templates are on the import page, and in `client/public/templates/`.

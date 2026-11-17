@@ -1,16 +1,17 @@
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Eye, FileText, FileX, Mic, Plus, RefreshCw, Replace, Timer, Trash2, Video, VideoOff } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Eye, FileText, FileX, ListOrdered, Mic, Plus, RefreshCw, Replace, Timer, Trash2, Video, VideoOff } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { LessonDTO, LessonTopicDTO, ResourceDTO, SyncMode } from '@classroom/shared';
 import { MatchBadge, ProvenanceBadge, SessionStatusBadge } from '@/components/badges';
 import { EmptyState, Loading, Notice } from '@/components/feedback';
-import { ResourcePreview } from '@/components/ResourceContent';
+import { TeacherLessonPlan } from '@/components/LessonPlan';
+import { ResourceFacts, ResourcePreview } from '@/components/ResourceContent';
 import { PageBody } from '@/components/TeacherShell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Input, Label } from '@/components/ui/field';
-import { useAsync, usePageTitle } from '@/hooks/useAsync';
+import { useAsync, useDebounced, usePageTitle } from '@/hooks/useAsync';
 import { api, ApiRequestError, errorMessage, type LessonTopicPatch } from '@/lib/api';
 import { cn, formatDateTime } from '@/lib/utils';
 
@@ -24,6 +25,8 @@ function Availability({ available, kind }: { available: boolean; kind: 'Video' |
   );
 }
 
+const RESULT_LIMIT = 30;
+
 function ReplaceDialog({
   topic,
   onClose,
@@ -33,16 +36,21 @@ function ReplaceDialog({
   onClose: () => void;
   onChoose: (resourceId: string | null) => void;
 }) {
+  // Opens already searching for the topic's own name, so the closest resources are listed first.
   const [query, setQuery] = useState('');
-  const library = useAsync(() => api.resources(query.trim() || undefined), [query]);
+  useEffect(() => setQuery(topic?.displayTitle ?? ''), [topic?.id, topic?.displayTitle]);
+  const search = useDebounced(query.trim());
+  const library = useAsync(() => (topic ? api.resources(search || undefined) : Promise.resolve([])), [search, topic?.id]);
+  const shown = library.data?.slice(0, RESULT_LIMIT) ?? [];
   return (
     <Dialog open={topic !== null} onOpenChange={(o) => !o && onClose()} title={`Choose a resource for "${topic?.displayTitle ?? ''}"`} description="Only resources that exist in the library can be chosen.">
       <Label htmlFor="resource-search">Search the library</Label>
-      <Input id="resource-search" className="mt-1.5" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+      <Input id="resource-search" type="search" className="mt-1.5" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+      <p className="mt-1.5 text-sm text-ink-soft">Best matches first. Words can be in any order and small typos are fine; add a grade or language to narrow it, for example "traffic rules marathi".</p>
       <div className="mt-4 space-y-2" aria-live="polite">
         {library.error && <Notice tone="error">{library.error}</Notice>}
         {library.data?.length === 0 && <p className="text-ink-soft">No resources match that search.</p>}
-        {library.data?.map((resource: ResourceDTO) => (
+        {shown.map((resource: ResourceDTO) => (
           <button
             key={resource.id}
             type="button"
@@ -51,6 +59,7 @@ function ReplaceDialog({
           >
             <span className="block font-bold">{resource.title}</span>
             <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <ResourceFacts resource={resource} />
               <ProvenanceBadge provenance={resource.provenance} />
               <Availability available={!!resource.videoUrl} kind="Video" />
               <Availability available={!!resource.scriptText} kind="Script" />
@@ -58,6 +67,9 @@ function ReplaceDialog({
           </button>
         ))}
       </div>
+      {(library.data?.length ?? 0) > RESULT_LIMIT && (
+        <p className="mt-3 text-ink-soft">Showing the best {RESULT_LIMIT} of {library.data!.length}. Add more words to narrow the search.</p>
+      )}
       <div className="mt-5 border-t border-line pt-4">
         <Button variant="secondary" onClick={() => onChoose(null)}>Leave without a resource</Button>
       </div>
@@ -92,6 +104,7 @@ function TopicRow({
 }) {
   const [duration, setDuration] = useState(String(topic.estimatedDurationSeconds));
   const [editing, setEditing] = useState(false);
+  const [showPlan, setShowPlan] = useState(false);
   const [name, setName] = useState(topic.displayTitle);
   const number = topic.position + 1;
 
@@ -133,7 +146,8 @@ function TopicRow({
 
         {topic.resource ? (
           <p className="mt-1">
-            <span className="text-ink-soft">Resource:</span> <span className="font-bold">{topic.resource.title}</span>
+            <span className="text-ink-soft">Resource:</span> <span className="font-bold">{topic.resource.title}</span>{' '}
+            <ResourceFacts resource={topic.resource} />
           </p>
         ) : (
           <p className="mt-1 font-bold text-bad">No matching resource found in the current library.</p>
@@ -150,6 +164,11 @@ function TopicRow({
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {topic.resource && <Button variant="secondary" size="sm" onClick={onPreview} aria-label={`Preview resource for Topic ${number}`}><Eye aria-hidden />Preview</Button>}
+          {topic.resource && (
+            <Button variant="secondary" size="sm" onClick={() => setShowPlan((open) => !open)} aria-expanded={showPlan} aria-label={`Lesson plan for Topic ${number}`}>
+              <ListOrdered aria-hidden />{showPlan ? 'Hide lesson plan' : 'Lesson plan'}
+            </Button>
+          )}
           {!locked && (
             <>
               <Button variant="secondary" size="sm" onClick={onReplace} aria-label={`${topic.resource ? 'Replace' : 'Choose'} resource for Topic ${number}`}><Replace aria-hidden />{topic.resource ? 'Replace' : 'Choose resource'}</Button>
@@ -172,6 +191,7 @@ function TopicRow({
             </span>
           )}
         </div>
+        {showPlan && topic.resource && <TeacherLessonPlan resourceId={topic.resource.id} />}
       </div>
       {!locked && (
         <div className="flex shrink-0 flex-col gap-1">

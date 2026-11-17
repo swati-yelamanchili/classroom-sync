@@ -23,7 +23,9 @@ test('an unmatched topic is reported honestly and can be resolved or left', asyn
   // Replace with an existing resource.
   await page.getByRole('button', { name: 'Choose resource for Topic 1' }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Search the library').fill('fractions');
+  // Opens already searching for the topic's name; a typo still finds the resource.
+  await expect(dialog.getByLabel('Search the library')).toHaveValue('Mathematics');
+  await dialog.getByLabel('Search the library').fill('fractons');
   await dialog.getByRole('button', { name: /Fractions \(demo placeholder\)/ }).click();
   await expect(page.getByTestId('topic-1')).toContainText('Chosen by you');
   await expect(page.getByTestId('topic-1')).toContainText('Video: not available');
@@ -114,6 +116,7 @@ test('resources can be added, edited and deleted by hand, and invalid input is e
   await expect(dialog).toHaveCount(0);
 
   await page.getByLabel('Search').fill(title);
+  await expect(page.getByTestId('resource-row')).toHaveCount(1);
   await page.getByRole('button', { name: `Edit ${title}` }).click();
   await page.getByRole('dialog').getByLabel('Subject').fill('Edited subject');
   await page.getByRole('dialog').getByRole('button', { name: 'Save resource' }).click();
@@ -242,6 +245,12 @@ test('key pages pass automated WCAG A/AA checks', async ({ browser }) => {
   await expectNoSeriousA11yIssues(landing, 'landing');
   await landing.goto('/join');
   await expectNoSeriousA11yIssues(landing, 'join');
+  await landing.goto('/lessons');
+  await expect(landing.getByRole('heading', { name: 'Choose your lesson' })).toBeVisible();
+  await expectNoSeriousA11yIssues(landing, 'student lesson list');
+  await landing.getByRole('link', { name: /Addition, Subtraction, Volcanoes/ }).first().click();
+  await expect(landing.getByTestId('self-paced-topic-title')).toBeVisible();
+  await expectNoSeriousA11yIssues(landing, 'self-paced student lesson');
 });
 
 test('the student page works by keyboard and fits a phone without sideways scrolling', async ({ browser }) => {

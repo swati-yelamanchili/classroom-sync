@@ -2,7 +2,7 @@ import {
   CommandCooldown,
   DEFAULT_VOICE_GRAMMAR,
   describeCommand,
-  parseVoiceCommand,
+  parseVoiceCommands,
   validateCommand,
   type CommandContext,
   type CommandDecision,
@@ -27,13 +27,26 @@ export interface LastCommand {
   action: string;
 }
 
+/** One line of the opt-in testing log. Kept in memory on the teacher's device only. */
+export interface HeardEntry {
+  at: number;
+  heard: string;
+  result: string;
+  /** From the final transcript to the server's answer, for commands that were sent. */
+  latencyMs?: number;
+}
+
 export interface VoiceStatus {
   state: VoiceState;
   message: string | null;
   lastCommand: LastCommand | null;
   /** True briefly after speech that was not a command. The words themselves are not retained. */
   heardNonCommand: boolean;
+  /** Everything heard, while testing mode is on. Empty otherwise. */
+  log: HeardEntry[];
 }
+
+const LOG_LIMIT = 50;
 
 export type CommandRequest = Extract<CommandDecision, { ok: true }>['request'];
 
@@ -62,7 +75,8 @@ const MESSAGES: Partial<Record<SpeechErrorCode, string>> = {
 };
 
 export class SpeechRecognitionService {
-  private status: VoiceStatus = { state: 'off', message: null, lastCommand: null, heardNonCommand: false };
+  private status: VoiceStatus = { state: 'off', message: null, lastCommand: null, heardNonCommand: false, log: [] };
+  private logging = false;
   private enabled = false;
   private fatal = false;
   private consecutiveFailures = 0;
@@ -92,6 +106,17 @@ export class SpeechRecognitionService {
 
   setGrammar(grammar: VoiceGrammar): void {
     this.grammar = grammar;
+  }
+
+  /** Testing mode: records every transcript, command or not, so recognition accuracy can be measured. */
+  setLogging(on: boolean): void {
+    this.logging = on;
+    if (!on && this.status.log.length) this.update({ log: [] });
+  }
+
+  private addLog(entry: Omit<HeardEntry, 'at'>): void {
+    if (!this.logging) return;
+    this.update({ log: [{ at: this.now(), ...entry }, ...this.status.log].slice(0, LOG_LIMIT) });
   }
 
   private now(): number {
@@ -183,27 +208,33 @@ export class SpeechRecognitionService {
 
   private handleResult(alternatives: string[]): void {
     if (!this.enabled) return;
+    const heardAt = this.now();
     for (const transcript of alternatives) {
-      const command = parseVoiceCommand(transcript, this.grammar);
-      if (command) {
-        this.handleCommand(command, transcript.trim());
+      const commands = parseVoiceCommands(transcript, this.grammar);
+      if (commands.length) {
+        for (const command of commands) this.handleCommand(command, transcript.trim(), heardAt);
         return;
       }
     }
+    this.addLog({ heard: alternatives[0]?.trim() ?? '', result: 'Not a command: ignored' });
     if (this.hintTimer) clearTimeout(this.hintTimer);
     this.update({ heardNonCommand: true });
     this.hintTimer = setTimeout(() => this.update({ heardNonCommand: false }), this.options.resultHoldMs ?? 3000);
   }
 
-  private handleCommand(command: VoiceCommand, heard: string): void {
-    if (!this.cooldown.allow(command, this.now())) return;
-    this.queue = this.queue.then(() => this.process(command, heard));
+  private handleCommand(command: VoiceCommand, heard: string, heardAt: number): void {
+    if (!this.cooldown.allow(command, this.now())) {
+      this.addLog({ heard, result: `${describeCommand(command)}: ignored as a repeat` });
+      return;
+    }
+    this.queue = this.queue.then(() => this.process(command, heard, heardAt));
   }
 
-  private async process(command: VoiceCommand, heard: string): Promise<void> {
+  private async process(command: VoiceCommand, heard: string, heardAt: number): Promise<void> {
     if (!this.enabled) return;
     const decision = validateCommand(command, this.options.getContext());
     if (!decision.ok) {
+      this.addLog({ heard, result: `Rejected: ${decision.reason}` });
       this.finish(heard, 'rejected', decision.reason);
       return;
     }
@@ -211,9 +242,12 @@ export class SpeechRecognitionService {
     this.update({ state: 'processing', message: `${describeCommand(command)}…`, heardNonCommand: false });
     try {
       const action = await this.options.dispatch(decision.request);
+      this.addLog({ heard, result: action, latencyMs: this.now() - heardAt });
       this.finish(heard, 'recognised', action);
     } catch (error) {
-      this.finish(heard, 'rejected', error instanceof Error ? error.message : 'The server rejected the command.');
+      const reason = error instanceof Error ? error.message : 'The server rejected the command.';
+      this.addLog({ heard, result: `Rejected by server: ${reason}`, latencyMs: this.now() - heardAt });
+      this.finish(heard, 'rejected', reason);
     }
   }
 

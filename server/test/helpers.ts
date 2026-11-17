@@ -5,6 +5,10 @@ import request from 'supertest';
 import type { StudentSnapshot, TeacherSnapshot } from '@classroom/shared';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/config';
+import { TranscriptError, type FetchTranscript } from '../src/services/transcripts';
+
+/** Default for suites that do not test transcripts: never runs Python or reaches YouTube. */
+const noTranscripts: FetchTranscript = () => Promise.reject(new TranscriptError('Transcripts are not available in tests.'));
 
 export const testConfig: AppConfig = {
   port: 0,
@@ -16,11 +20,13 @@ export const testConfig: AppConfig = {
   publicBaseUrl: null,
   rateLimits: { api: 100_000, login: 1000, studentLookup: 100_000 },
   topicRecognitionProvider: 'disabled',
+  https: null,
+  transcripts: { pythonBin: 'python', transcriptScript: 'unused' },
 };
 
-export async function createTestServer(config: AppConfig = testConfig) {
+export async function createTestServer(config: AppConfig = testConfig, fetchTranscript: FetchTranscript = noTranscripts) {
   const db = new PrismaClient();
-  const server = createApp(db, config);
+  const server = createApp(db, config, { fetchTranscript });
   await new Promise<void>((resolve) => server.httpServer.listen(0, resolve));
   const port = (server.httpServer.address() as AddressInfo).port;
   const url = `http://127.0.0.1:${port}`;
@@ -58,6 +64,7 @@ export async function createTestServer(config: AppConfig = testConfig) {
 export type TestServer = Awaited<ReturnType<typeof createTestServer>>;
 
 export async function resetDb(db: PrismaClient) {
+  await db.videoTranscript.deleteMany();
   await db.sessionEvent.deleteMany();
   await db.classroomSession.deleteMany();
   await db.lessonTopic.deleteMany();

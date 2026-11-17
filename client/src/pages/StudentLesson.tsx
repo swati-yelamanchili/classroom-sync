@@ -1,20 +1,22 @@
 import { CheckCircle2, Clock, Loader2, Minus, PauseCircle, Plus, WifiOff } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { StudentSnapshot } from '@classroom/shared';
+import { youtubeVideoId, type StudentSnapshot } from '@classroom/shared';
 import { SessionStatusBadge } from '@/components/badges';
 import { Notice } from '@/components/feedback';
-import { ScriptPanel, SourceLine, VideoPanel } from '@/components/ResourceContent';
+import { ScriptPanel, SourceLine, VideoPanel, type SeekRequest } from '@/components/ResourceContent';
+import { TranscriptView } from '@/components/Transcript';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { usePageTitle } from '@/hooks/useAsync';
 import { useStudentSession, type ConnectionState } from '@/hooks/useSessionChannel';
+import { api } from '@/lib/api';
 import { cn, readPreference, writePreference } from '@/lib/utils';
 
 const TEXT_SIZES = ['1.1rem', '1.3rem', '1.55rem', '1.85rem'];
 const TEXT_SIZE_PREF = 'classroom-sync.script-size';
 
-function useTextSize() {
+export function useTextSize() {
   const [step, setStep] = useState(() => {
     const stored = readPreference(TEXT_SIZE_PREF);
     const parsed = Number(stored);
@@ -52,6 +54,11 @@ function ConnectionBanner({ connection }: { connection: ConnectionState }) {
 export function StudentLessonView({ snapshot, connection }: { snapshot: StudentSnapshot; connection: ConnectionState }) {
   const text = useTextSize();
   const topic = snapshot.currentTopic;
+  const [seek, setSeek] = useState<SeekRequest>(null);
+  useEffect(() => setSeek(null), [topic?.index]);
+  const resource = topic?.resource;
+  // Ashray Akruti's YouTube lessons have no script, so their timestamped captions take its place.
+  const showTranscript = !!resource && !resource.scriptText && !!resource.videoUrl && !!youtubeVideoId(resource.videoUrl);
 
   // Announced politely so assistive technology hears about changes without losing its place.
   const announcement = (() => {
@@ -109,7 +116,7 @@ export function StudentLessonView({ snapshot, connection }: { snapshot: StudentS
             <section aria-labelledby="video-heading" className="min-w-0">
               <Card className="p-3 md:p-4">
                 <h2 id="video-heading" className="mb-2 text-xl">Sign language video</h2>
-                <VideoPanel videoUrl={topic.resource.videoUrl} title={topic.resource.title} />
+                <VideoPanel videoUrl={topic.resource.videoUrl} title={topic.resource.title} seek={seek} />
               </Card>
               <div className="mt-3"><SourceLine resource={topic.resource} /></div>
               {topic.resource.provenance === 'demo' && <p className="mt-2 text-ink-soft">This is a demonstration placeholder, not official Ashray Akruti content.</p>}
@@ -117,21 +124,32 @@ export function StudentLessonView({ snapshot, connection }: { snapshot: StudentS
             <section aria-labelledby="script-heading" className="flex min-w-0 flex-col">
               <Card className="flex min-h-0 flex-1 flex-col p-3 md:p-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <h2 id="script-heading" className="text-xl">Script</h2>
-                  <div role="group" aria-label="Script text size" className="flex items-center gap-1">
-                    <Button variant="secondary" size="icon" disabled={!text.canShrink} onClick={() => text.change(-1)} aria-label="Smaller script text"><Minus aria-hidden /></Button>
-                    <Button variant="secondary" size="icon" disabled={!text.canGrow} onClick={() => text.change(1)} aria-label="Larger script text"><Plus aria-hidden /></Button>
+                  <h2 id="script-heading" className="text-xl">{showTranscript ? 'Transcript' : 'Script'}</h2>
+                  <div role="group" aria-label={showTranscript ? 'Transcript text size' : 'Script text size'} className="flex items-center gap-1">
+                    <Button variant="secondary" size="icon" disabled={!text.canShrink} onClick={() => text.change(-1)} aria-label={`Smaller ${showTranscript ? 'transcript' : 'script'} text`}><Minus aria-hidden /></Button>
+                    <Button variant="secondary" size="icon" disabled={!text.canGrow} onClick={() => text.change(1)} aria-label={`Larger ${showTranscript ? 'transcript' : 'script'} text`}><Plus aria-hidden /></Button>
                   </div>
                 </div>
-                <div
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Script text"
-                  className="flex-1 overflow-y-auto leading-relaxed md:max-h-[calc(100dvh-14rem)]"
-                  style={{ fontSize: text.size }}
-                >
-                  <ScriptPanel scriptText={topic.resource.scriptText} language={topic.resource.language} />
-                </div>
+                {showTranscript ? (
+                  <TranscriptView
+                    load={() => api.sessionTranscript(snapshot.sessionCode, snapshot.currentTopicIndex + 1)}
+                    loadKey={`${snapshot.sessionCode}-${snapshot.currentTopicIndex}`}
+                    videoUrl={topic.resource.videoUrl}
+                    onSeek={(seconds) => setSeek({ seconds, at: Date.now() })}
+                    textSize={text.size}
+                    maxHeight="max-h-[60vh] md:max-h-[calc(100dvh-18rem)]"
+                  />
+                ) : (
+                  <div
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Script text"
+                    className="flex-1 overflow-y-auto leading-relaxed md:max-h-[calc(100dvh-14rem)]"
+                    style={{ fontSize: text.size }}
+                  >
+                    <ScriptPanel scriptText={topic.resource.scriptText} language={topic.resource.language} />
+                  </div>
+                )}
               </Card>
             </section>
           </div>

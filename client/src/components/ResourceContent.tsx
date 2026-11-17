@@ -1,6 +1,6 @@
 import { ExternalLink, VideoOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { classifyVideoUrl, type ResourceView } from '@classroom/shared';
+import { classifyVideoUrl, languageName, type ResourceView } from '@classroom/shared';
 import { ProvenanceBadge } from './badges';
 import { Button } from './ui/button';
 import { Notice } from './feedback';
@@ -17,8 +17,11 @@ function OpenInNewTab({ url, label = 'Open video in a new tab', primary }: { url
   );
 }
 
-/** The student controls playback: nothing here autoplays. */
-export function VideoPanel({ videoUrl, title }: { videoUrl: string | null; title: string }) {
+/** A request to play from a moment, made by tapping a transcript time. `at` makes repeated taps distinct. */
+export type SeekRequest = { seconds: number; at: number } | null;
+
+/** The student controls playback: it only starts when they press play or tap a transcript time. */
+export function VideoPanel({ videoUrl, title, seek = null }: { videoUrl: string | null; title: string; seek?: SeekRequest }) {
   const source = useMemo(() => (videoUrl ? classifyVideoUrl(videoUrl) : null), [videoUrl]);
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [videoUrl]);
@@ -56,10 +59,10 @@ export function VideoPanel({ videoUrl, title }: { videoUrl: string | null; title
         />
       ) : (
         <iframe
-          key={source.embedUrl}
-          src={source.embedUrl}
+          key={`${source.embedUrl}#${seek?.at ?? 0}`}
+          src={seek && source.provider === 'YouTube' ? `${source.embedUrl}?start=${Math.floor(seek.seconds)}&autoplay=1` : source.embedUrl}
           title={`Sign language video: ${title}`}
-          allow="fullscreen; picture-in-picture"
+          allow="autoplay; fullscreen; picture-in-picture"
           referrerPolicy="strict-origin-when-cross-origin"
           sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
           className="aspect-video w-full rounded-md border-0 bg-ink"
@@ -81,6 +84,12 @@ export function ScriptPanel({ scriptText, language }: { scriptText: string | nul
       {scriptText}
     </div>
   );
+}
+
+/** Grade/subject and language, so versions of the same topic can be told apart. */
+export function ResourceFacts({ resource }: { resource: { subject?: string | null; language: string | null } }) {
+  const facts = [resource.subject, languageName(resource.language)].filter(Boolean).join(' · ');
+  return facts ? <span className="text-ink-soft">{facts}</span> : null;
 }
 
 export function SourceLine({ resource }: { resource: ResourceView }) {

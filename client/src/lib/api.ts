@@ -9,7 +9,10 @@ import type {
   ResourceStats,
   SessionEventDTO,
   SessionSummary,
+  StudentLessonDTO,
+  StudentLessonListItem,
   StudentSnapshot,
+  TranscriptDTO,
   SyncMode,
   TeacherSnapshot,
 } from '@classroom/shared';
@@ -87,6 +90,8 @@ export const api = {
   createResource: (draft: ResourceDraft) => request<ResourceDTO>('/resources', { method: 'POST', body: draft }),
   updateResource: (id: string, draft: ResourceDraft) => request<ResourceDTO>(`/resources/${id}`, { method: 'PATCH', body: draft }),
   deleteResource: (id: string) => request<void>(`/resources/${id}`, { method: 'DELETE' }),
+  resourceTranscript: (id: string) => request<TranscriptDTO>(`/resources/${id}/transcript`),
+  refetchTranscript: (id: string) => request<TranscriptDTO>(`/resources/${id}/transcript`, { method: 'POST' }),
   importResources: (format: 'csv' | 'json', content: string, dryRun: boolean) =>
     request<ImportReport>('/resources/import', { method: 'POST', body: { format, content, dryRun } }),
 
@@ -112,6 +117,12 @@ export const api = {
   setSessionMode: (id: string, syncMode: SyncMode) => request<TeacherSnapshot>(`/sessions/${id}/mode`, { method: 'POST', body: { syncMode } }),
 
   studentSession: (code: string) => request<StudentSnapshot>(`/student/session/${encodeURIComponent(code)}`),
+  sessionTranscript: (code: string, topicNumber: number) =>
+    request<TranscriptDTO>(`/student/session/${encodeURIComponent(code)}/topics/${topicNumber}/transcript`),
+  studentLessons: () => request<StudentLessonListItem[]>('/student/lessons'),
+  studentLesson: (id: string) => request<StudentLessonDTO>(`/student/lessons/${encodeURIComponent(id)}`),
+  studentTranscript: (lessonId: string, topicNumber: number) =>
+    request<TranscriptDTO>(`/student/lessons/${encodeURIComponent(lessonId)}/topics/${topicNumber}/transcript`),
 };
 
 export function errorMessage(error: unknown): string {

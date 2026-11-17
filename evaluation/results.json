@@ -1,0 +1,113 @@
+{
+  "date": "2026-11-14T05:04:06.283Z",
+  "trialsPerScenario": 20,
+  "scenarios": [
+    {
+      "kind": "student device and network",
+      "name": "Desktop",
+      "network": "No throttling",
+      "pageLoadMs": 261,
+      "pageLoadKb": 180,
+      "syncDelayMs": {
+        "n": 20,
+        "median": 40,
+        "p95": 71,
+        "max": 80,
+        "min": 33
+      },
+      "correctUpdates": "20/20",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "kind": "student device and network",
+      "name": "Android phone (Pixel 7, emulated)",
+      "network": "No throttling",
+      "pageLoadMs": 241,
+      "pageLoadKb": 180,
+      "syncDelayMs": {
+        "n": 20,
+        "median": 45,
+        "p95": 54,
+        "max": 63,
+        "min": 34
+      },
+      "correctUpdates": "20/20",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "kind": "student device and network",
+      "name": "Android tablet (Galaxy Tab S4, emulated)",
+      "network": "No throttling",
+      "pageLoadMs": 229,
+      "pageLoadKb": 180,
+      "syncDelayMs": {
+        "n": 20,
+        "median": 42,
+        "p95": 60,
+        "max": 78,
+        "min": 31
+      },
+      "correctUpdates": "20/20",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "kind": "student device and network",
+      "name": "Android phone on Fast 3G",
+      "network": "Fast 3G",
+      "pageLoadMs": 1893,
+      "pageLoadKb": 162,
+      "syncDelayMs": {
+        "n": 20,
+        "median": 146,
+        "p95": 161,
+        "max": 164,
+        "min": 133
+      },
+      "correctUpdates": "20/20",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "kind": "student device and network",
+      "name": "Android phone on Slow 3G",
+      "network": "Slow 3G",
+      "pageLoadMs": 5327,
+      "pageLoadKb": 147,
+      "syncDelayMs": {
+        "n": 20,
+        "median": 295,
+        "p95": 324,
+        "max": 433,
+        "min": 261
+      },
+      "correctUpdates": "20/20",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "kind": "voice pipeline",
+      "name": "Final transcript to student screen (Android phone, emulated)",
+      "network": "No throttling",
+      "syncDelayMs": {
+        "n": 20,
+        "median": 23,
+        "p95": 29,
+        "max": 36,
+        "min": 20
+      },
+      "correctUpdates": "20/20",
+      "note": "Excludes the speech engine itself: it starts when the final transcript is delivered."
+    },
+    {
+      "kind": "reconnection",
+      "name": "Student offline, teacher changes topic, student back online",
+      "network": "Offline, then no throttling",
+      "recoveryMs": {
+        "n": 5,
+        "median": 756,
+        "p95": 1175,
+        "max": 1175,
+        "min": 87
+      },
+      "correctUpdates": "5/5"
+    }
+  ]
+}

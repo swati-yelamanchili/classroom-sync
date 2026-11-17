@@ -12,15 +12,17 @@
     "node": ">=20"
   },
   "scripts": {
-    "setup": "node -e \"require('fs').existsSync('.env')||require('fs').copyFileSync('.env.example','.env')\" && npm install && npm run db:migrate && npm run db:seed",
+    "setup": "node -e \"require('fs').existsSync('.env')||require('fs').copyFileSync('.env.example','.env')\" && npm install && npm run db:migrate && npm run db:seed && npm run db:import -- resources/ashray-akruti-youtube.csv",
     "dev": "concurrently -n server,client -c teal,blue \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
     "typecheck": "tsc --noEmit && npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client",
     "test": "npm run test -w shared && npm run test -w server && npm run test -w client",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=e2e",
+    "evaluate": "playwright test --project=evaluation",
     "db:migrate": "npm run db:migrate -w server",
-    "db:seed": "npm run db:seed -w server"
+    "db:seed": "npm run db:seed -w server",
+    "db:import": "npm run db:import -w server --"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

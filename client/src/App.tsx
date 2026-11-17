@@ -1,16 +1,22 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
-import { TeacherShell } from '@/components/TeacherShell';
+import { Loading } from '@/components/feedback';
 import { Button } from '@/components/ui/button';
 import { Join } from '@/pages/Join';
 import { Landing } from '@/pages/Landing';
-import { LessonReview } from '@/pages/LessonReview';
-import { LiveSession } from '@/pages/LiveSession';
-import { NewLesson } from '@/pages/NewLesson';
-import { ResourceImport } from '@/pages/ResourceImport';
-import { ResourceLibrary } from '@/pages/ResourceLibrary';
 import { StudentLesson } from '@/pages/StudentLesson';
-import { TeacherHome } from '@/pages/TeacherHome';
-import { TeacherLogin } from '@/pages/TeacherLogin';
+
+// Teacher pages load on demand, so a student's phone on a slow connection downloads only what it uses.
+const TeacherShell = lazy(() => import('@/components/TeacherShell').then((m) => ({ default: m.TeacherShell })));
+const TeacherLogin = lazy(() => import('@/pages/TeacherLogin').then((m) => ({ default: m.TeacherLogin })));
+const TeacherHome = lazy(() => import('@/pages/TeacherHome').then((m) => ({ default: m.TeacherHome })));
+const NewLesson = lazy(() => import('@/pages/NewLesson').then((m) => ({ default: m.NewLesson })));
+const LessonReview = lazy(() => import('@/pages/LessonReview').then((m) => ({ default: m.LessonReview })));
+const LiveSession = lazy(() => import('@/pages/LiveSession').then((m) => ({ default: m.LiveSession })));
+const ResourceLibrary = lazy(() => import('@/pages/ResourceLibrary').then((m) => ({ default: m.ResourceLibrary })));
+const ResourceImport = lazy(() => import('@/pages/ResourceImport').then((m) => ({ default: m.ResourceImport })));
+const StudentLessonList = lazy(() => import('@/pages/StudentBrowse').then((m) => ({ default: m.StudentLessonList })));
+const StudentSelfPaced = lazy(() => import('@/pages/StudentBrowse').then((m) => ({ default: m.StudentSelfPaced })));
 
 function NotFound() {
   return (
@@ -25,21 +31,25 @@ function NotFound() {
 export function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/join" element={<Join />} />
-        <Route path="/student/:code" element={<StudentLesson />} />
-        <Route path="/teacher/login" element={<TeacherLogin />} />
-        <Route path="/teacher" element={<TeacherShell />}>
-          <Route index element={<TeacherHome />} />
-          <Route path="lessons/new" element={<NewLesson />} />
-          <Route path="lessons/:id" element={<LessonReview />} />
-          <Route path="sessions/:id" element={<LiveSession />} />
-          <Route path="resources" element={<ResourceLibrary />} />
-          <Route path="resources/import" element={<ResourceImport />} />
-        </Route>
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<Loading label="Loading…" />}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/join" element={<Join />} />
+          <Route path="/student/:code" element={<StudentLesson />} />
+          <Route path="/lessons" element={<StudentLessonList />} />
+          <Route path="/lessons/:id" element={<StudentSelfPaced />} />
+          <Route path="/teacher/login" element={<TeacherLogin />} />
+          <Route path="/teacher" element={<TeacherShell />}>
+            <Route index element={<TeacherHome />} />
+            <Route path="lessons/new" element={<NewLesson />} />
+            <Route path="lessons/:id" element={<LessonReview />} />
+            <Route path="sessions/:id" element={<LiveSession />} />
+            <Route path="resources" element={<ResourceLibrary />} />
+            <Route path="resources/import" element={<ResourceImport />} />
+          </Route>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

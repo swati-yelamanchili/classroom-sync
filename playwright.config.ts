@@ -9,6 +9,11 @@ export const E2E_PASSCODE = 'e2e-passcode';
 
 export default defineConfig({
   testDir: './e2e',
+  // Measurements for the evaluation report run separately: `npm run evaluate`.
+  projects: [
+    { name: 'e2e', testIgnore: /evaluation\.spec\.ts/ },
+    { name: 'evaluation', testMatch: /evaluation\.spec\.ts/ },
+  ],
   timeout: 60_000,
   expect: { timeout: 8_000 },
   // One server and database, shared; specs create their own lessons but read shared library state.
@@ -25,8 +30,8 @@ export default defineConfig({
   },
   webServer: {
     command: [
-      `mkdir -p ${TMP}`,
-      `rm -f ${path.join(TMP, 'e2e.db')} ${path.join(TMP, 'e2e.db-journal')}`,
+      // Node rather than mkdir/rm, so this also works in Windows' cmd.exe.
+      `node -e "const fs=require('fs');fs.rmSync(process.argv[1],{recursive:true,force:true});fs.mkdirSync(process.argv[1],{recursive:true})" "${TMP}"`,
       'npm run build',
       'cd server',
       'npx prisma migrate deploy',

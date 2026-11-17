@@ -40,7 +40,7 @@ export function normalizeSessionCode(code: string): string {
   return code.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
 
-function toTopicView(topic: LoadedSession['lesson']['topics'][number], index: number): TopicView {
+export function toTopicView(topic: LoadedSession['lesson']['topics'][number], index: number): TopicView {
   const r = topic.resource;
   return {
     index,

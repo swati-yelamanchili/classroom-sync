@@ -48,7 +48,7 @@ const TENS: Record<string, number> = {
 };
 // Speech engines commonly transcribe a spoken digit as its homophone. These are honoured only
 // inside an otherwise complete command, so ordinary sentences cannot trigger them.
-const HOMOPHONES: Record<string, number> = { won: 1, to: 2, too: 2, for: 4, ate: 8 };
+const HOMOPHONES: Record<string, number> = { won: 1, to: 2, too: 2, tree: 3, for: 4, fore: 4, ate: 8 };
 
 /** Converts "3", "three" or "twenty one" to a number; anything else returns null. */
 export function parseSpokenNumber(words: string): number | null {
@@ -66,36 +66,100 @@ export function parseSpokenNumber(words: string): number | null {
   return null;
 }
 
+// Spellings speech engines produce for the same spoken words.
+const SPELLINGS: Record<string, string> = { goto: 'go to', topics: 'topic' };
+
+function tokensOf(text: string): string[] {
+  return normalizeTranscript(text)
+    .split(' ')
+    .flatMap((word) => (SPELLINGS[word] ?? word).split(' '))
+    .filter(Boolean);
+}
+
+function startsAt(tokens: string[], at: number, phrase: string[]): boolean {
+  return phrase.length > 0 && phrase.every((word, i) => tokens[at + i] === word);
+}
+
 /**
- * Strict whole-phrase grammar: the normalised transcript must be exactly one command, otherwise the
- * result is null. "Topic three is very important" and "today we will start topic three" are not
- * commands, by design.
+ * Strict whole-phrase grammar: the normalised transcript must consist only of commands, otherwise
+ * the result is empty. "Topic three is very important" and "today we will start topic three" are
+ * not commands, by design. Several commands in one transcript are all returned, because continuous
+ * recognition joins phrases spoken close together ("start topic 2 next topic").
  */
-export function parseVoiceCommand(
-  transcript: string,
-  grammar: VoiceGrammar = DEFAULT_VOICE_GRAMMAR,
-): VoiceCommand | null {
-  let text = normalizeTranscript(transcript);
-  const wake = normalizeTranscript(grammar.wakePhrase);
-  if (wake && (text === wake || text.startsWith(`${wake} `))) {
-    text = text.slice(wake.length).trim();
-  } else if (grammar.requireWakePhrase) {
+export function parseVoiceCommands(transcript: string, grammar: VoiceGrammar = DEFAULT_VOICE_GRAMMAR): VoiceCommand[] {
+  const tokens = tokensOf(transcript);
+  const wake = tokensOf(grammar.wakePhrase);
+  const fixed: Array<[string[], VoiceCommand]> = [
+    ...grammar.nextPhrases.map((p): [string[], VoiceCommand] => [tokensOf(p), { type: 'next' }]),
+    ...grammar.previousPhrases.map((p): [string[], VoiceCommand] => [tokensOf(p), { type: 'previous' }]),
+    ...grammar.pausePhrases.map((p): [string[], VoiceCommand] => [tokensOf(p), { type: 'pause' }]),
+    ...grammar.resumePhrases.map((p): [string[], VoiceCommand] => [tokensOf(p), { type: 'resume' }]),
+  ];
+  const verbs = grammar.topicVerbs.map((verb) => [...tokensOf(verb), 'topic']);
+
+  // Tries every command that fits at `at`, keeping the first reading that uses up all the words.
+  const parseFrom = (at: number): VoiceCommand[] | null => {
+    if (at === tokens.length) return [];
+    let start = at;
+    if (startsAt(tokens, start, wake)) start += wake.length;
+    else if (grammar.requireWakePhrase) return null;
+
+    const candidates: Array<[VoiceCommand, number]> = [];
+    for (const [phrase, command] of fixed) {
+      if (startsAt(tokens, start, phrase)) candidates.push([command, start + phrase.length]);
+    }
+    for (const verb of verbs) {
+      if (!startsAt(tokens, start, verb)) continue;
+      let numberAt = start + verb.length;
+      if (tokens[numberAt] === 'number') numberAt += 1;
+      for (const length of [2, 1]) {
+        if (numberAt + length > tokens.length) continue;
+        const topicNumber = parseSpokenNumber(tokens.slice(numberAt, numberAt + length).join(' '));
+        if (topicNumber !== null) candidates.push([{ type: 'goto', topicNumber }, numberAt + length]);
+      }
+    }
+    for (const [command, end] of candidates) {
+      const rest = parseFrom(end);
+      if (rest) return [command, ...rest];
+    }
     return null;
-  }
-  if (!text) return null;
+  };
+  return parseFrom(0) ?? [];
+}
 
-  if (grammar.nextPhrases.includes(text)) return { type: 'next' };
-  if (grammar.previousPhrases.includes(text)) return { type: 'previous' };
-  if (grammar.pausePhrases.includes(text)) return { type: 'pause' };
-  if (grammar.resumePhrases.includes(text)) return { type: 'resume' };
+/** A transcript that is exactly one command, or null. */
+export function parseVoiceCommand(transcript: string, grammar: VoiceGrammar = DEFAULT_VOICE_GRAMMAR): VoiceCommand | null {
+  const commands = parseVoiceCommands(transcript, grammar);
+  return commands.length === 1 ? commands[0]! : null;
+}
 
-  for (const verb of grammar.topicVerbs) {
-    const prefix = `${verb} topic `;
-    if (!text.startsWith(prefix)) continue;
-    const topicNumber = parseSpokenNumber(text.slice(prefix.length).replace(/^number /, ''));
-    if (topicNumber !== null) return { type: 'goto', topicNumber };
+export type PartCommand = { type: 'part'; partNumber: number } | { type: 'nextPart' } | { type: 'previousPart' };
+
+/**
+ * Finds "part 3", "part number three", "next part" or "previous part" anywhere in what was heard, and
+ * returns the last one said. Unlike topic commands this is deliberately loose: it only moves one
+ * student's own page, and teachers say "now part three" mid-sentence. Homophones ("part to") count
+ * only at the very end, so "take part to win" does nothing.
+ */
+export function parsePartCommand(transcript: string): PartCommand | null {
+  const tokens = tokensOf(transcript);
+  let found: PartCommand | null = null;
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (tokens[i] !== 'part') continue;
+    if (tokens[i - 1] === 'next') found = { type: 'nextPart' };
+    else if (tokens[i - 1] === 'previous') found = { type: 'previousPart' };
+    const at = tokens[i + 1] === 'number' ? i + 2 : i + 1;
+    for (const length of [2, 1]) {
+      const words = tokens.slice(at, at + length);
+      if (words.length !== length) continue;
+      const partNumber = parseSpokenNumber(words.join(' '));
+      if (partNumber === null) continue;
+      if (length === 1 && HOMOPHONES[words[0]!] !== undefined && at + 1 !== tokens.length) continue;
+      found = { type: 'part', partNumber };
+      break;
+    }
   }
-  return null;
+  return found;
 }
 
 export function describeCommand(command: VoiceCommand): string {

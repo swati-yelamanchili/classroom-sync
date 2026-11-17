@@ -33,6 +33,16 @@ export function useAsync<T>(load: () => Promise<T>, deps: readonly unknown[]) {
   return { data, setData, error, loading, reload };
 }
 
+/** The value, once it has stopped changing for `ms`. Saves a request per keystroke while typing a search. */
+export function useDebounced<T>(value: T, ms = 250): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(timer);
+  }, [value, ms]);
+  return settled;
+}
+
 export function usePageTitle(title: string): void {
   useEffect(() => {
     document.title = `${title} · Classroom Sync`;
