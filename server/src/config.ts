@@ -12,8 +12,8 @@ export interface AppConfig {
   /** Requests per minute, per IP. */
   rateLimits: { api: number; login: number; studentLookup: number };
   topicRecognitionProvider: string;
-  /** Lesson plans: written by Gemini from YouTube transcripts, which a Python helper fetches. */
-  lessonPlans: { geminiApiKey: string | null; geminiModel: string; pythonBin: string; transcriptScript: string };
+  /** Timestamped YouTube transcripts, fetched by a Python helper. */
+  transcripts: { pythonBin: string; transcriptScript: string };
 }
 
 const DEV_SECRET = 'local-development-secret-change-me';
@@ -42,9 +42,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       studentLookup: Number(env.RATE_LIMIT_STUDENT ?? 120),
     },
     topicRecognitionProvider: env.TOPIC_RECOGNITION_PROVIDER ?? 'disabled',
-    lessonPlans: {
-      geminiApiKey: env.GEMINI_API_KEY || null,
-      geminiModel: env.GEMINI_MODEL || 'gemini-2.5-flash',
+    transcripts: {
       pythonBin: env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3'),
       // src/config.ts in development and dist/index.js when built are both one level below server/.
       transcriptScript: fileURLToPath(new URL('../scripts/youtube_transcript.py', import.meta.url)),

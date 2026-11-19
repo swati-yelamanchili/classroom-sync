@@ -20,7 +20,6 @@ export const testConfig: AppConfig = {
   publicBaseUrl: null,
   rateLimits: { api: 100_000, login: 1000, studentLookup: 100_000 },
   topicRecognitionProvider: 'disabled',
-  https: null,
   transcripts: { pythonBin: 'python', transcriptScript: 'unused' },
 };
 

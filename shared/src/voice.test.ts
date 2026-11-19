@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CommandCooldown, DEFAULT_VOICE_GRAMMAR, normalizeTranscript, parsePartCommand, parseSpokenNumber, parseVoiceCommand, parseVoiceCommands, validateCommand } from './voice';
+import { CommandCooldown, DEFAULT_VOICE_GRAMMAR, normalizeTranscript, parseSpokenNumber, parseVoiceCommand, parseVoiceCommands, validateCommand } from './voice';
 
 const context = { status: 'active' as const, currentTopicIndex: 0, totalTopics: 3 };
 
@@ -154,27 +154,5 @@ describe('CommandCooldown', () => {
     const cooldown = new CommandCooldown(1000);
     expect(cooldown.allow({ type: 'goto', topicNumber: 2 }, 0)).toBe(true);
     expect(cooldown.allow({ type: 'goto', topicNumber: 3 }, 100)).toBe(true);
-  });
-});
-
-describe('parsePartCommand', () => {
-  it.each([
-    ['Part 3', 3],
-    ['part three', 3],
-    ['Now look at part 2 of the lesson', 2],
-    ['part number four', 4],
-    ['go to part 1. Actually part 5', 5],
-    ['and finally part to', 2],
-  ])('"%s" goes to part %i', (heard, partNumber) => {
-    expect(parsePartCommand(heard)).toEqual({ type: 'part', partNumber });
-  });
-
-  it('understands next and previous part', () => {
-    expect(parsePartCommand('next part')).toEqual({ type: 'nextPart' });
-    expect(parsePartCommand('Okay, previous part please')).toEqual({ type: 'previousPart' });
-  });
-
-  it.each(['take part to win', 'every part of the plant', 'the parts are listed', 'topic 3', ''])('ignores "%s"', (heard) => {
-    expect(parsePartCommand(heard)).toBeNull();
   });
 });

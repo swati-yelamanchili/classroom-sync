@@ -15,12 +15,12 @@ import { AUTH_COOKIE, AUTH_TTL_MS, checkPasscode, isTeacherCookieHeader, issueTe
 import { ApiError } from './lib/errors';
 import { parseBody } from './lib/validate';
 import { createRealtime } from './realtime/hub';
-import { lessonPlanDeps, LessonPlanService, type LessonPlanDeps } from './services/lessonPlans';
 import { createLessonSchema, LessonService, patchLessonSchema } from './services/lessons';
 import { resourceInputSchema } from './services/resourceSchema';
 import { ResourceService } from './services/resources';
 import { SessionService } from './services/sessions';
 import { createTopicRecognitionProvider } from './services/topicRecognition';
+import { pythonTranscripts, TranscriptService, type FetchTranscript } from './services/transcripts';
 
 const MINUTE = 60_000;
 
@@ -54,14 +54,14 @@ const changeTopicSchema = z
 
 const sourceSchema = z.object({ source: z.enum(['manual', 'voice']).default('manual') });
 
-export function createApp(db: PrismaClient, config: AppConfig, overrides: { lessonPlanDeps?: LessonPlanDeps } = {}) {
+export function createApp(db: PrismaClient, config: AppConfig, overrides: { fetchTranscript?: FetchTranscript } = {}) {
   const resources = new ResourceService(db);
   const lessons = new LessonService(db);
   const sessions = new SessionService(db);
-  const plans = new LessonPlanService(db, overrides.lessonPlanDeps ?? lessonPlanDeps(config.lessonPlans));
-  // Selecting a video for a lesson queues its plan; generation itself runs in the background.
-  const planFor = async <T extends { topics: { resource: { id: string } | null }[] }>(lesson: T): Promise<T> => {
-    await plans.ensure(lesson.topics.map((topic) => topic.resource?.id));
+  const transcripts = new TranscriptService(db, overrides.fetchTranscript ?? pythonTranscripts(config.transcripts));
+  // Selecting a video for a lesson starts downloading its transcript, so it is ready before students ask.
+  const prefetchFor = async <T extends { topics: { resource: { id: string } | null }[] }>(lesson: T): Promise<T> => {
+    await transcripts.prefetch(lesson.topics.map((topic) => topic.resource?.id));
     return lesson;
   };
   const topicRecognition = createTopicRecognitionProvider(config.topicRecognitionProvider);
@@ -150,11 +150,11 @@ export function createApp(db: PrismaClient, config: AppConfig, overrides: { less
   api.patch('/resources/:id', teacher, async (req, res) => {
     res.json({ data: await resources.update(idParam(req), parseBody(resourceInputSchema, req.body)) });
   });
-  api.get('/resources/:id/plan', teacher, async (req, res) => {
-    res.json({ data: await plans.get(idParam(req)) });
+  api.get('/resources/:id/transcript', teacher, async (req, res) => {
+    res.json({ data: await transcripts.get(idParam(req)) });
   });
-  api.post('/resources/:id/plan', teacher, async (req, res) => {
-    res.json({ data: await plans.regenerate(idParam(req)) });
+  api.post('/resources/:id/transcript', teacher, async (req, res) => {
+    res.json({ data: await transcripts.get(idParam(req), { refresh: true }) });
   });
   api.delete('/resources/:id', teacher, async (req, res) => {
     await resources.remove(idParam(req));
@@ -166,20 +166,20 @@ export function createApp(db: PrismaClient, config: AppConfig, overrides: { less
     res.json({ data: await lessons.list() });
   });
   api.post('/lessons', teacher, async (req, res) => {
-    res.status(201).json({ data: await planFor(await lessons.create(parseBody(createLessonSchema, req.body))) });
+    res.status(201).json({ data: await prefetchFor(await lessons.create(parseBody(createLessonSchema, req.body))) });
   });
   api.get('/lessons/:id', teacher, async (req, res) => {
     res.json({ data: await lessons.get(idParam(req)) });
   });
   api.patch('/lessons/:id', teacher, async (req, res) => {
-    res.json({ data: await planFor(await lessons.patch(idParam(req), parseBody(patchLessonSchema, req.body))) });
+    res.json({ data: await prefetchFor(await lessons.patch(idParam(req), parseBody(patchLessonSchema, req.body))) });
   });
   api.delete('/lessons/:id', teacher, async (req, res) => {
     await lessons.remove(idParam(req));
     res.status(204).end();
   });
   api.post('/lessons/:id/match-resources', teacher, async (req, res) => {
-    res.json({ data: await planFor(await lessons.rematch(idParam(req))) });
+    res.json({ data: await prefetchFor(await lessons.rematch(idParam(req))) });
   });
   api.post('/lessons/:id/confirm', teacher, async (req, res) => {
     res.json({ data: await lessons.confirm(idParam(req)) });
@@ -226,17 +226,23 @@ export function createApp(db: PrismaClient, config: AppConfig, overrides: { less
   api.get('/student/session/:code', limiter(MINUTE, config.rateLimits.studentLookup), async (req, res) => {
     res.json({ data: await sessions.getStudent(String(req.params.code)) });
   });
-  // Students browsing on their own: confirmed lessons with each video's plan.
-  api.get('/student/lessons', limiter(MINUTE, config.rateLimits.studentLookup), async (_req, res) => {
-    res.json({ data: await plans.listStudentLessons() });
-  });
-  api.get('/student/lessons/:id', limiter(MINUTE, config.rateLimits.studentLookup), async (req, res) => {
-    res.json({ data: await plans.getStudentLesson(idParam(req)) });
-  });
-  api.get('/student/lessons/:id/topics/:number/transcript', limiter(MINUTE, config.rateLimits.studentLookup), async (req, res) => {
+  const topicNumber = (req: Request) => {
     const number = Number(req.params.number);
     if (!Number.isInteger(number) || number < 1) throw new ApiError(400, 'invalid_topic', 'Topic numbers start at 1.');
-    res.json({ data: await plans.getStudentTranscript(idParam(req), number) });
+    return number;
+  };
+  api.get('/student/session/:code/topics/:number/transcript', limiter(MINUTE, config.rateLimits.studentLookup), async (req, res) => {
+    res.json({ data: await transcripts.forSessionTopic(String(req.params.code), topicNumber(req)) });
+  });
+  // Students browsing on their own: confirmed lessons, each topic's video and its transcript.
+  api.get('/student/lessons', limiter(MINUTE, config.rateLimits.studentLookup), async (_req, res) => {
+    res.json({ data: await transcripts.listStudentLessons() });
+  });
+  api.get('/student/lessons/:id', limiter(MINUTE, config.rateLimits.studentLookup), async (req, res) => {
+    res.json({ data: await transcripts.getStudentLesson(idParam(req)) });
+  });
+  api.get('/student/lessons/:id/topics/:number/transcript', limiter(MINUTE, config.rateLimits.studentLookup), async (req, res) => {
+    res.json({ data: await transcripts.forLessonTopic(idParam(req), topicNumber(req)) });
   });
 
   api.use((_req, _res, next) => {
@@ -278,11 +284,11 @@ export function createApp(db: PrismaClient, config: AppConfig, overrides: { less
     httpServer,
     io,
     sessions,
-    plans,
+    transcripts,
     topicRecognition,
     async close() {
       sessions.shutdown();
-      await plans.idle();
+      await transcripts.idle();
       await io.close();
     },
   };

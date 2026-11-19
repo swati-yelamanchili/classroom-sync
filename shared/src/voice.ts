@@ -133,35 +133,6 @@ export function parseVoiceCommand(transcript: string, grammar: VoiceGrammar = DE
   return commands.length === 1 ? commands[0]! : null;
 }
 
-export type PartCommand = { type: 'part'; partNumber: number } | { type: 'nextPart' } | { type: 'previousPart' };
-
-/**
- * Finds "part 3", "part number three", "next part" or "previous part" anywhere in what was heard, and
- * returns the last one said. Unlike topic commands this is deliberately loose: it only moves one
- * student's own page, and teachers say "now part three" mid-sentence. Homophones ("part to") count
- * only at the very end, so "take part to win" does nothing.
- */
-export function parsePartCommand(transcript: string): PartCommand | null {
-  const tokens = tokensOf(transcript);
-  let found: PartCommand | null = null;
-  for (let i = 0; i < tokens.length; i += 1) {
-    if (tokens[i] !== 'part') continue;
-    if (tokens[i - 1] === 'next') found = { type: 'nextPart' };
-    else if (tokens[i - 1] === 'previous') found = { type: 'previousPart' };
-    const at = tokens[i + 1] === 'number' ? i + 2 : i + 1;
-    for (const length of [2, 1]) {
-      const words = tokens.slice(at, at + length);
-      if (words.length !== length) continue;
-      const partNumber = parseSpokenNumber(words.join(' '));
-      if (partNumber === null) continue;
-      if (length === 1 && HOMOPHONES[words[0]!] !== undefined && at + 1 !== tokens.length) continue;
-      found = { type: 'part', partNumber };
-      break;
-    }
-  }
-  return found;
-}
-
 export function describeCommand(command: VoiceCommand): string {
   switch (command.type) {
     case 'goto':

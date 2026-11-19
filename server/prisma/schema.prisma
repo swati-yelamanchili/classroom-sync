@@ -32,23 +32,22 @@ model Resource {
   updatedAt          DateTime @updatedAt
 
   lessonTopics LessonTopic[]
-  lessonPlan   LessonPlan?
+  transcript   VideoTranscript?
 
   @@index([videoUrl])
 }
 
-// AI-written plan for one video, made from its YouTube transcript. One per resource, reused by every lesson.
-model LessonPlan {
-  id                 String   @id @default(cuid())
-  resourceId         String   @unique
-  status             String   @default("pending") // pending | ready | failed
-  parts              String   @default("[]") // JSON [{ title, content }], exactly 5 when ready
-  transcriptLanguage String?
-  transcript         String? // JSON { language, generated, segments: [{ start, duration, text }] }, kept for students
-  model              String?
-  error              String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+// A video's YouTube captions with timestamps, downloaded once and kept. One per resource.
+model VideoTranscript {
+  id         String   @id @default(cuid())
+  resourceId String   @unique
+  status     String // ready | failed
+  language   String?
+  generated  Boolean  @default(true) // YouTube's automatic captions rather than uploaded ones
+  segments   String   @default("[]") // JSON [{ start, duration, text }], seconds from the start of the video
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 }

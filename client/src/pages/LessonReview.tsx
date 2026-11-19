@@ -1,12 +1,12 @@
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Eye, FileText, FileX, ListOrdered, Mic, Plus, RefreshCw, Replace, Timer, Trash2, Video, VideoOff } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Captions, CheckCircle2, Eye, FileText, FileX, Mic, Plus, RefreshCw, Replace, Timer, Trash2, Video, VideoOff } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import type { LessonDTO, LessonTopicDTO, ResourceDTO, SyncMode } from '@classroom/shared';
+import { youtubeVideoId, type LessonDTO, type LessonTopicDTO, type ResourceDTO, type SyncMode } from '@classroom/shared';
 import { MatchBadge, ProvenanceBadge, SessionStatusBadge } from '@/components/badges';
 import { EmptyState, Loading, Notice } from '@/components/feedback';
-import { TeacherLessonPlan } from '@/components/LessonPlan';
 import { ResourceFacts, ResourcePreview } from '@/components/ResourceContent';
 import { PageBody } from '@/components/TeacherShell';
+import { TranscriptView } from '@/components/Transcript';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
@@ -104,7 +104,8 @@ function TopicRow({
 }) {
   const [duration, setDuration] = useState(String(topic.estimatedDurationSeconds));
   const [editing, setEditing] = useState(false);
-  const [showPlan, setShowPlan] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const hasTranscript = !!topic.resource?.videoUrl && !!youtubeVideoId(topic.resource.videoUrl);
   const [name, setName] = useState(topic.displayTitle);
   const number = topic.position + 1;
 
@@ -164,9 +165,9 @@ function TopicRow({
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {topic.resource && <Button variant="secondary" size="sm" onClick={onPreview} aria-label={`Preview resource for Topic ${number}`}><Eye aria-hidden />Preview</Button>}
-          {topic.resource && (
-            <Button variant="secondary" size="sm" onClick={() => setShowPlan((open) => !open)} aria-expanded={showPlan} aria-label={`Lesson plan for Topic ${number}`}>
-              <ListOrdered aria-hidden />{showPlan ? 'Hide lesson plan' : 'Lesson plan'}
+          {hasTranscript && (
+            <Button variant="secondary" size="sm" onClick={() => setShowTranscript((open) => !open)} aria-expanded={showTranscript} aria-label={`Transcript for Topic ${number}`}>
+              <Captions aria-hidden />{showTranscript ? 'Hide transcript' : 'Transcript'}
             </Button>
           )}
           {!locked && (
@@ -191,7 +192,17 @@ function TopicRow({
             </span>
           )}
         </div>
-        {showPlan && topic.resource && <TeacherLessonPlan resourceId={topic.resource.id} />}
+        {showTranscript && topic.resource && (
+          <div className="mt-3 rounded-md border border-line bg-paper p-3 md:p-4" data-testid="teacher-transcript">
+            <TranscriptView
+              load={() => api.resourceTranscript(topic.resource!.id)}
+              loadKey={topic.resource.id}
+              videoUrl={topic.resource.videoUrl}
+              onRefetch={() => api.refetchTranscript(topic.resource!.id)}
+              maxHeight="max-h-80"
+            />
+          </div>
+        )}
       </div>
       {!locked && (
         <div className="flex shrink-0 flex-col gap-1">

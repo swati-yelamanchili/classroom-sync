@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { parsePartCommand, parseVoiceCommand, type PartCommand } from '@classroom/shared';
+import { parseVoiceCommand } from '@classroom/shared';
 import { BrowserSpeechAdapter } from './browserAdapter';
 import type { SpeechErrorCode, SpeechRecognitionAdapter } from './types';
 
-export type StudentCommand = PartCommand | { type: 'topic'; topicNumber: number } | { type: 'nextTopic' } | { type: 'previousTopic' };
+export type StudentCommand = { type: 'topic'; topicNumber: number } | { type: 'nextTopic' } | { type: 'previousTopic' };
 export type ListenerState = 'off' | 'listening' | 'permission-denied' | 'unavailable' | 'error';
 
-/** Topic commands keep the strict teacher grammar; part commands are found anywhere in a sentence. */
+/** The teacher's topic commands, with the same strict whole-phrase grammar. Pause and resume do not apply. */
 export function parseStudentCommand(transcript: string): StudentCommand | null {
   const topic = parseVoiceCommand(transcript);
   if (topic?.type === 'goto') return { type: 'topic', topicNumber: topic.topicNumber };
   if (topic?.type === 'next') return { type: 'nextTopic' };
   if (topic?.type === 'previous') return { type: 'previousTopic' };
-  return parsePartCommand(transcript);
+  return null;
 }
 
 const REPEAT_WINDOW_MS = 2500;
@@ -24,7 +24,7 @@ const ERROR_MESSAGES: Partial<Record<SpeechErrorCode, string>> = {
 };
 
 /**
- * Listens on the student's own device for the teacher saying "Part 3", "next part" or "Start Topic 2".
+ * Listens on the student's own device for the teacher saying "Start Topic 2", "next topic" or "previous topic".
  * Browsers stop continuous recognition by themselves, so it restarts, backing off after errors.
  */
 export class StudentListener {
@@ -43,7 +43,7 @@ export class StudentListener {
 
   start(): void {
     if (!this.adapter.supported) {
-      this.onState('unavailable', 'This browser cannot listen for speech. Tap the parts instead, or use Google Chrome.');
+      this.onState('unavailable', 'This browser cannot listen for speech. Use the topic buttons instead, or use Google Chrome.');
       return;
     }
     if (this.enabled) return;
@@ -84,7 +84,7 @@ export class StudentListener {
         if (!this.enabled || code === 'no-speech' || code === 'aborted') return;
         if (code === 'not-allowed' || code === 'service-not-allowed') {
           this.enabled = false;
-          this.onState('permission-denied', 'Microphone permission was denied. Allow it in the browser settings, or tap the parts instead.');
+          this.onState('permission-denied', 'Microphone permission was denied. Allow it in the browser settings, or use the topic buttons instead.');
           return;
         }
         this.failures += 1;
@@ -95,7 +95,7 @@ export class StudentListener {
         if (this.now() - this.startedAt > 5000) this.failures = 0;
         if (this.failures >= MAX_FAILURES) {
           this.enabled = false;
-          this.onState('error', 'Listening keeps stopping, so it has been turned off. Tap the parts instead, or try again.');
+          this.onState('error', 'Listening keeps stopping, so it has been turned off. Use the topic buttons instead, or try again.');
           return;
         }
         this.timer = setTimeout(() => {

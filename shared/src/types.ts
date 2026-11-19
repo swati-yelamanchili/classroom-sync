@@ -108,24 +108,6 @@ export interface LessonListItem {
   sessions: SessionSummary[];
 }
 
-export const LESSON_PLAN_PARTS = 5;
-export type LessonPlanStatus = 'pending' | 'ready' | 'failed';
-
-export interface LessonPlanPart {
-  title: string;
-  content: string;
-}
-
-/** An AI-written plan for one video. Resources without a YouTube video have no plan (null). */
-export interface LessonPlanDTO {
-  status: LessonPlanStatus;
-  /** Exactly LESSON_PLAN_PARTS when ready, empty otherwise. */
-  parts: LessonPlanPart[];
-  transcriptLanguage: string | null;
-  error: string | null;
-  updatedAt: string;
-}
-
 /** One caption line; times are seconds from the start of the video. */
 export interface TranscriptSegment {
   start: number;
@@ -133,11 +115,16 @@ export interface TranscriptSegment {
   text: string;
 }
 
-/** A video's YouTube transcript, as downloaded: usually YouTube's automatic captions. */
+/**
+ * A video's YouTube captions with timestamps, exactly as YouTube has them (usually its automatic
+ * captions). "failed" carries a reason a person can act on, and no segments.
+ */
 export interface TranscriptDTO {
-  language: string;
+  status: 'ready' | 'failed';
+  language: string | null;
   generated: boolean;
   segments: TranscriptSegment[];
+  error: string | null;
 }
 
 export interface StudentLessonListItem {
@@ -150,10 +137,9 @@ export interface StudentLessonTopic {
   number: number;
   displayTitle: string;
   resource: ResourceView | null;
-  plan: LessonPlanDTO | null;
 }
 
-/** A confirmed lesson as a student browsing on their own sees it: every topic with its video and plan. */
+/** A confirmed lesson as a student browsing on their own sees it: every topic with its video. */
 export interface StudentLessonDTO {
   id: string;
   title: string;
